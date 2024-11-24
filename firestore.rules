@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    // Helper function to check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Shifts collection rules
+    match /shifts/{shiftId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId) &&
+        request.resource.data.keys().hasAll(['userId', 'date', 'workplaceId', 'positionId', 'hoursWorked', 'cashTips', 'cardTips', 'hourlyWage']);
+      allow update: if isOwner(resource.data.userId) &&
+        request.resource.data.userId == resource.data.userId;
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // Workplaces collection rules
+    match /workplaces/{workplaceId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId) &&
+        request.resource.data.keys().hasAll(['userId', 'name', 'location', 'positions']);
+      allow update: if isOwner(resource.data.userId) &&
+        request.resource.data.userId == resource.data.userId;
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // User preferences rules
+    match /preferences/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) &&
+        request.resource.data.keys().hasAll(['currency', 'timezone', 'defaultView']);
+      allow delete: if isOwner(userId);
+    }
+  }
+}
